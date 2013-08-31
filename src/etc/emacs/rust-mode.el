@@ -44,6 +44,10 @@
         (rust-rewind-past-str-cmnt))
     (if (/= starting (point))
         (rust-rewind-irrelevant))))
+(defun rust-first-indent-after-brace ()
+  (forward-char)
+  (when (looking-at "[[:space:]]") (forward-to-word 1))
+  (current-column))
 
 (defun rust-mode-indent-line ()
   (interactive)
@@ -52,13 +56,16 @@
            (back-to-indentation)
            (let ((level (rust-paren-level)))
              (cond
-              ;; A function return type is 1 level indented
-              ((looking-at "->") (* rust-indent-offset (+ level 1)))
+              ;; A function return type is indented to the corresponding function arguments
+              ((looking-at "->") 
+               (save-excursion
+                 (backward-list)
+                 (rust-first-indent-after-brace)))
 
               ;; A closing brace is 1 level unindended
               ((looking-at "}") (* rust-indent-offset (- level 1)))
 
-              ; Doc comments in /** style with leading * indent to line up the *s
+              ;; Doc comments in /** style with leading * indent to line up the *s
               ((and (nth 4 (syntax-ppss)) (looking-at "*"))
                (+ 1 (* rust-indent-offset level)))
 
@@ -77,19 +84,13 @@
                  (backward-up-list)
                  (cond 
                   ((and
-                      (looking-at "[[(]")
-                      ; We don't want to indent out to the open bracket if the
-                      ; open bracket ends the line
-                      (save-excursion 
-                        (forward-char)
-                        (not (looking-at "[[:space:]]*\\(?://.*\\)?$"))))
-                   (+ 1 (current-column)))
-                  ;; Check for fields on the same line as the open curly brace:
-                  ((looking-at "{[[:space:]]*[^\n]*,[[:space:]]*$")
-                   (progn
-                    (forward-char)
-                    (when (looking-at "[[:space:]]") (forward-to-word 1))
-                    (current-column)))
+                    (looking-at "[[({]")
+                    ;; We don't want to indent out to the open bracket if the
+                    ;; open bracket ends the line
+                    (save-excursion 
+                      (forward-char)
+                      (not (looking-at "[[:blank:]]*\\(?://.*\\)?$"))))
+                   (rust-first-indent-after-brace))
                   (t (progn
                      (goto-char pt)
                      (back-to-indentation)
@@ -100,7 +101,7 @@
                          (beginning-of-line)
                          (rust-rewind-irrelevant)
                          (end-of-line)
-                         (if (looking-back "[,;{}(][[:space:]]*\\(?://.*\\)?")
+                         (if (looking-back "[[,;{}(][[:space:]]*\\(?://.*\\)?")
                              (* rust-indent-offset level)
                            (back-to-indentation)
                            (if (looking-at "#")
