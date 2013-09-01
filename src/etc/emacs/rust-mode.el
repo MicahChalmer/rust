@@ -231,7 +231,14 @@
   ;; Misc
   (set (make-local-variable 'comment-start) "// ")
   (set (make-local-variable 'comment-end)   "")
-  (set (make-local-variable 'indent-tabs-mode) nil))
+  (set (make-local-variable 'indent-tabs-mode) nil)
+
+  ;; Allow paragraph fills for comments
+  (set (make-local-variable 'comment-start-skip) 
+       "\\(?://[/!]*\\|/\\*[\\*!]?\\)[[:space:]]*")
+  (set (make-local-variable 'paragraph-start) 
+       "[[:space:]]*\\(?://[/!]*\\|\\**\\)?[[:space:]]*$");;"[[:space:]]*\\(?:\\*[[:space:]]*\\)?$")
+  (set (make-local-variable 'paragraph-separate) paragraph-start))
 
 
 ;;;###autoload
