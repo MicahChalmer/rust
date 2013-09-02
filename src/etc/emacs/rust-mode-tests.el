@@ -44,8 +44,6 @@
  */"))
 
 (ert-deftest fill-paragraph-top-level-multi-line-style-doc-comment-second-line-top-of-file ()
-  "For whatever reason, the logic does not work correctly at the top of the file."
-  :expected-result :failed
   (test-fill-paragraph 
    "/**
  * This is a very very very very very very very long string
@@ -196,7 +194,7 @@ This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
  */"))
     (test-fill-paragraph
      test-comment
-     4 ;; just after /**
+     4 ;; in the middle of the /**
      correctly-filled)
     (test-fill-paragraph
      test-comment

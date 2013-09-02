@@ -242,10 +242,12 @@
       ;; prefix to figure out what the new prefix should be, rather than
       ;; inferring it from the comment start.
       (let ((next-bol (line-beginning-position 2)))
-        (when (and (nth 4 (syntax-ppss))
+        (when (save-excursion
+                (end-of-line)
+                (and (nth 4 (syntax-ppss))
                    (looking-back comment-start-skip)
                    (looking-at "[[:space:]]*$")
-                   (save-excursion (nth 4 (syntax-ppss next-bol))))
+                   (nth 4 (syntax-ppss next-bol))))
           (progn
             (goto-char next-bol))))
 
@@ -275,7 +277,6 @@
            (fill-prefix 
             (or line-comment-start
               fill-prefix)))
-        (message "In comment? %S - prefix is %S" (nth 4 (syntax-ppss)) fill-prefix)
         (funcall body)))))
 
 (defun rust-fill-paragraph (&rest args)
@@ -295,6 +296,11 @@
    (lambda ()
      (apply 'do-auto-fill args)
      t)))
+
+(defun rust-fill-forward-paragraph (arg)
+  ;; This is to work around some funny behavior when a paragraph separator is
+  ;; at the very top of the file and there is a fill prefix.
+  (let ((fill-prefix nil)) (forward-paragraph arg)))
 
 ;; For compatibility with Emacs < 24, derive conditionally
 (defalias 'rust-parent-mode
@@ -328,7 +334,8 @@
        (concat "[[:space:]]*\\(?:" comment-start-skip "\\|\\*/?[[:space:]]*\\|\\)$"))
   (set (make-local-variable 'paragraph-separate) paragraph-start)
   (set (make-local-variable 'normal-auto-fill-function) 'rust-do-auto-fill)
-  (set (make-local-variable 'fill-paragraph-function) 'rust-fill-paragraph))
+  (set (make-local-variable 'fill-paragraph-function) 'rust-fill-paragraph)
+  (set (make-local-variable 'fill-forward-paragraph-function) 'rust-fill-forward-paragraph))
 
 
 ;;;###autoload
