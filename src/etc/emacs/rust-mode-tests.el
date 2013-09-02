@@ -124,6 +124,19 @@
        90 ;; End of the separator line in the middle
        with-second-paragraph-filled))))
 
+(ert-deftest fill-paragraph-multi-paragraph-single-line-style-indented ()
+  (test-fill-paragraph
+   "     // This is the first really really really really really really really long paragraph
+     //
+     // This is the second really really really really really really long paragraph"
+   7 ;; In between the //
+   "     // This is the first really
+     // really really really
+     // really really really
+     // long paragraph
+     //
+     // This is the second really really really really really really long paragraph"))
+
 (ert-deftest fill-paragraph-multi-line-style-inner-doc-comment ()
   (test-fill-paragraph
    "/*! This is a very very very very very very very long string
@@ -157,6 +170,17 @@ dilly dally dilly dally doo.
 
 This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
 */"))
+
+(ert-deftest fill-paragraph-single-line-inline-comment ()
+  ;;FIXME: Not sure what this should even do...
+  :expected-result :failed
+  (test-fill-paragraph
+   "other stuff       /* This is a very very very very very very very long string */"
+   4
+"other stuff /* This is a very
+             * very very very
+             * very very very
+             * long string */"))
 
 (ert-deftest fill-paragraph-multi-positions-near-last-line ()
   (let ((test-comment
@@ -247,3 +271,18 @@ This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
 /// really really really really
 /// really long paragraph"
     ))
+
+(ert-deftest auto-fill-multi-line-prefixless ()
+  "Auto-fill does not respect `fill-paragraph-function' and will thus not be able to use our custom prefix detection.  Therefore this won't work..."
+  :expected-result :failed
+  (test-auto-fill
+   "/*
+
+ */"
+   4
+   "This is a very very very very very very very long string"
+   "/* 
+This is a very very very very
+very very very long string
+*/"
+   ))
