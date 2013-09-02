@@ -222,6 +222,5 @@ This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
 ///
 /// This is the second really
 /// really really really really
-/// really long paragraph
-"
+/// really long paragraph"
     ))
