@@ -32,11 +32,13 @@
 
 (ert-deftest fill-paragraph-top-level-multi-line-style-doc-comment-second-line ()
   (test-fill-paragraph 
-   "/** 
+   "
+/**
  * This is a very very very very very very very long string
  */"
-   1
-   "/** 
+   2
+   "
+/**
  * This is a very very very very
  * very very very long string
  */"))
@@ -45,7 +47,7 @@
   (test-fill-paragraph
    "/** This is a very very very very very very very long string
  */"
-   1
+  1
    "/** This is a very very very
  * very very very very long
  * string
@@ -54,7 +56,8 @@
 (ert-deftest fill-paragraph-multi-paragraph-multi-line-style-doc-comment ()
   (let
       ((multi-paragraph-unfilled
-        "/**
+        "
+/**
  * This is the first really really really really really really really long paragraph
  *
  * This is the second really really really really really really long paragraph
@@ -62,7 +65,8 @@
     (test-fill-paragraph
      multi-paragraph-unfilled
      7
-     "/**
+     "
+/**
  * This is the first really
  * really really really really
  * really really long paragraph
@@ -72,7 +76,8 @@
     (test-fill-paragraph
      multi-paragraph-unfilled
      98
-     "/**
+     "
+/**
  * This is the first really really really really really really really long paragraph
  *
  * This is the second really

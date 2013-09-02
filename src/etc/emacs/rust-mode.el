@@ -207,7 +207,8 @@
 
          collect `(,(rust-re-item-def item) 1 ,face))))
 
-(defun rust-fill-prefix-for-line-start (line-start)
+(defun rust-fill-prefix-for-line-comment-start (line-start)
+  "Determine what to use for `fill-prefix' based on what is at the beginning of a line."
   (let ((result 
          ;; Replace /* with same number of spaces
          (replace-regexp-in-string
@@ -220,43 +221,48 @@
         (setq result (concat result " ")))
     result))
 
-(defun with-rust-comment-fill-prefix (body)
+(defun rust-find-comment-prefix-for-line (line-string)
+  " Determine if the given line has a comment prefix on it, assuming it is part of a comment."
+  (cond
+   ;; If we're inside the comment and see a * prefix, use it
+   ((string-match "^\\([[:space:]]*\\*+[[:space:]]*\\)" line-string)
+    (match-string 1 line-string))
+   ;; If we're at the start of a comment, figure out what prefix to
+   ;; use for the subsequent lines after it
+   ((string-match comment-in-front-regexp line-string)
+    (match-string 0 line-string))))
+
+(defun rust-with-comment-fill-prefix (body)
   "Set `fill-prefix' to handle multi-line comments with a * prefix on each line."
+  ;; We might move the point to fill the next comment, but we don't want it
+  ;; seeming to jump around on the user
   (save-excursion
     (let
-        ((syntaxppss (syntax-ppss))
-         (comment-in-front-regexp (concat "[[:space:]\n]*" comment-start-skip))
-         in-comment)
+        ((comment-in-front-regexp (concat "[[:space:]]*" comment-start-skip))
+         (syntaxppss (syntax-ppss)))
+      ;; If we're outside of a comment, with only whitespace and then a comment
+      ;; in front, jump to the next comment and prepare to fill that.
       (when (not (nth 4 syntaxppss))
         (beginning-of-line)
         (when (looking-at comment-in-front-regexp)
-          (search-forward-regexp comment-in-front-regexp)
+          (goto-char (match-end 0))
           (setq syntaxppss (syntax-ppss))))
-      (setq in-comment (nth 4 syntaxppss))
       (let*
-          ((line-string (buffer-substring-no-properties 
+          ((in-comment (nth 4 syntaxppss))
+           (line-string (buffer-substring-no-properties 
                          (line-beginning-position) (line-end-position)))
-           (line-start 
-            (cond
-             ;; Detect if we're inside the comment and see a * prefix
-             ((and in-comment
-                   (string-match
-                    "^\\([[:space:]]*\\*+[[:space:]]*\\)"
-                    line-string))
-              (match-string 1 line-string))
-             
-             ;; Detect if we're at the start of a comment
-             ((and in-comment
-                   (string-match comment-in-front-regexp line-string))
-              (match-string 0 line-string))
-             (t fill-prefix)))
-           (fill-prefix (rust-fill-prefix-for-line-start line-start)))
+           (line-comment-start (when in-comment 
+                                 (rust-find-comment-prefix-for-line line-string)))
+           (fill-prefix 
+            (if line-comment-start
+                (rust-fill-prefix-for-line-comment-start line-comment-start)
+              fill-prefix)))
         (message "In comment? %S - prefix is %S" in-comment fill-prefix)
         (funcall body)))))
 
 (defun rust-fill-paragraph (&rest args)
   "Special wrapping for `fill-paragraph' to handle multi-line comments with a * prefix on each line."
-  (with-rust-comment-fill-prefix
+  (rust-with-comment-fill-prefix
    (lambda ()
      (let
          ((fill-paragraph-function
@@ -267,9 +273,10 @@
 
 (defun rust-do-auto-fill (&rest args)
   "Special wrapping for `do-auto-fill' to handle multi-line comments with a * prefix on each line."
-  (with-rust-comment-fill-prefix
+  (rust-with-comment-fill-prefix
    (lambda ()
-     (apply 'do-auto-fill args))))
+     (apply 'do-auto-fill args)
+     t)))
 
 ;; For compatibility with Emacs < 24, derive conditionally
 (defalias 'rust-parent-mode
