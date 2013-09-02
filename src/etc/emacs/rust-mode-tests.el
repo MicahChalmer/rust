@@ -155,7 +155,7 @@ This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
  */"
    7
    "This is a very very very very very very very long string"
-   "/** 
+   "/**
  * This is a very very very very
  * very very very long string
  */"))
