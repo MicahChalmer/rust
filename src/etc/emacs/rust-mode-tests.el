@@ -182,6 +182,31 @@ This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
      correctly-filled)
 ))
 
+(ert-deftest fill-paragraph-with-no-space-after-star-prefix ()
+  (let ((test-comment
+"
+/** 
+ *This is a very very very very very very very long string
+ */")
+        (correctly-filled
+"
+/** 
+ *This is a very very very very
+ *very very very long string
+ */"))
+    (test-fill-paragraph
+     test-comment
+     4 ;; just after /**
+     correctly-filled)
+    (test-fill-paragraph
+     test-comment
+     62 ;; On second line of comment
+     correctly-filled)
+    (test-fill-paragraph
+     test-comment
+     66 ;; On last line of comment
+     correctly-filled)))
+
 (defun test-auto-fill (initial position inserted expected-result)
   (with-temp-buffer
     (rust-mode) 
