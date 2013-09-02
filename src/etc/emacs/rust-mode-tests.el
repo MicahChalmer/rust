@@ -22,7 +22,7 @@
                    (should (equal original-contents (buffer-string)))
                    ))))))
 
-(defun test-paragraph-fill (unfilled position expected-result)
+(defun test-fill-paragraph (unfilled position expected-result)
   (with-temp-buffer
     (rust-mode)
     (insert unfilled)
@@ -31,7 +31,7 @@
     (should (equal expected-result (buffer-string)))))
 
 (ert-deftest fill-paragraph-top-level-multi-line-style-doc-comment-second-line ()
-  (test-paragraph-fill 
+  (test-fill-paragraph 
    "/** 
  * This is a very very very very very very very long string
  */"
@@ -42,7 +42,7 @@
  */"))
 
 (ert-deftest fill-paragraph-top-level-multi-line-style-doc-comment-first-line ()
-  (test-paragraph-fill
+  (test-fill-paragraph
    "/** This is a very very very very very very very long string
  */"
    1
@@ -59,7 +59,7 @@
  *
  * This is the second really really really really really really long paragraph
  */"))
-    (test-paragraph-fill
+    (test-fill-paragraph
      multi-paragraph-unfilled
      7
      "/**
@@ -69,7 +69,7 @@
  *
  * This is the second really really really really really really long paragraph
  */")
-    (test-paragraph-fill
+    (test-fill-paragraph
      multi-paragraph-unfilled
      98
      "/**
@@ -86,7 +86,7 @@
         "/// This is the first really really really really really really really long paragraph
 ///
 /// This is the second really really really really really really long paragraph"))
-    (test-paragraph-fill
+    (test-fill-paragraph
      multi-paragraph-unfilled
      7
      "/// This is the first really
@@ -94,7 +94,7 @@
 /// really really long paragraph
 ///
 /// This is the second really really really really really really long paragraph")
-    (test-paragraph-fill
+    (test-fill-paragraph
      multi-paragraph-unfilled
      98
      "/// This is the first really really really really really really really long paragraph
@@ -104,7 +104,7 @@
 /// really long paragraph")))
 
 (ert-deftest fill-paragraph-multi-line-style-inner-doc-comment ()
-  (test-paragraph-fill
+  (test-fill-paragraph
    "/*! This is a very very very very very very very long string
  */"
    1
@@ -114,7 +114,7 @@
  */"))
 
 (ert-deftest fill-paragraph-single-line-style-inner-doc-comment ()
-  (test-paragraph-fill
+  (test-fill-paragraph
    "//! This is a very very very very very very very long string"
    1
    "//! This is a very very very
@@ -122,22 +122,22 @@
 //! string"))
 
 (ert-deftest fill-paragraph-prefixless-multi-line-doc-comment ()
-  (test-paragraph-fill
+  (test-fill-paragraph
    "/**
-
-This is my summary. Blah blah blah blah blah.
+This is my summary. Blah blah blah blah blah. Dilly dally dilly dally dilly dally doo.
 
 This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
 */"
    4
    "/**
 This is my summary. Blah blah
-blah blah blah.
+blah blah blah. Dilly dally
+dilly dally dilly dally doo.
 
 This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
 */"))
 
-(defun test-paragraph-auto-fill (initial position inserted expected-result)
+(defun test-auto-fill (initial position inserted expected-result)
   (with-temp-buffer
     (auto-fill-mode)
     (rust-mode)
@@ -149,7 +149,7 @@ This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
       (should (equal expected-result (buffer-string))))))
 
 (ert-deftest auto-fill-multi-line-doc-comment ()
-  (test-paragraph-auto-fill
+  (test-auto-fill
    "/**
  * 
  */"
@@ -161,7 +161,7 @@ This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
  */"))
 
 (ert-deftest auto-fill-single-line-doc-comment ()
-  (test-paragraph-auto-fill
+  (test-auto-fill
    "/// This is the first really
 /// really really really really
 /// really really long paragraph

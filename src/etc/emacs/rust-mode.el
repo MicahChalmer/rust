@@ -207,6 +207,69 @@
 
          collect `(,(rust-re-item-def item) 1 ,face))))
 
+(defun rust-fill-prefix-for-line-start (line-start)
+  (let ((result 
+         ;; Replace /* with same number of spaces
+         (replace-regexp-in-string
+          "\\(?:/\\*+\\)[!*]" (lambda (s)
+                                ;; We want the * to line up with the first * of the comment start
+                                (concat (make-string (- (length s) 2) ?\x20) "*"))
+          line-start)))
+       ;; Make sure we've got at least one space at the end
+    (if (not (= (aref result (- (length result) 1)) ?\x20))
+        (setq result (concat result " ")))
+    result))
+
+(defun with-rust-comment-fill-prefix (body)
+  "Set `fill-prefix' to handle multi-line comments with a * prefix on each line."
+  (save-excursion
+    (let
+        ((syntaxppss (syntax-ppss))
+         (comment-in-front-regexp (concat "[[:space:]\n]*" comment-start-skip))
+         in-comment)
+      (when (not (nth 4 syntaxppss))
+        (beginning-of-line)
+        (when (looking-at comment-in-front-regexp)
+          (search-forward-regexp comment-in-front-regexp)
+          (setq syntaxppss (syntax-ppss))))
+      (setq in-comment (nth 4 syntaxppss))
+      (let*
+          ((line-string (buffer-substring-no-properties 
+                         (line-beginning-position) (line-end-position)))
+           (line-start 
+            (cond
+             ;; Detect if we're inside the comment and see a * prefix
+             ((and in-comment
+                   (string-match
+                    "^\\([[:space:]]*\\*+[[:space:]]*\\)"
+                    line-string))
+              (match-string 1 line-string))
+             
+             ;; Detect if we're at the start of a comment
+             ((and in-comment
+                   (string-match comment-in-front-regexp line-string))
+              (match-string 0 line-string))
+             (t fill-prefix)))
+           (fill-prefix (rust-fill-prefix-for-line-start line-start)))
+        (message "In comment? %S - prefix is %S" in-comment fill-prefix)
+        (funcall body)))))
+
+(defun rust-fill-paragraph (&rest args)
+  "Special wrapping for `fill-paragraph' to handle multi-line comments with a * prefix on each line."
+  (with-rust-comment-fill-prefix
+   (lambda ()
+     (let
+         ((fill-paragraph-function
+           (if (not (eq fill-paragraph-function 'rust-fill-paragraph))
+               fill-paragraph-function)))
+       (apply 'fill-paragraph args)
+       t))))
+
+(defun rust-do-auto-fill (&rest args)
+  "Special wrapping for `do-auto-fill' to handle multi-line comments with a * prefix on each line."
+  (with-rust-comment-fill-prefix
+   (lambda ()
+     (apply 'do-auto-fill args))))
 
 ;; For compatibility with Emacs < 24, derive conditionally
 (defalias 'rust-parent-mode
@@ -235,10 +298,12 @@
 
   ;; Allow paragraph fills for comments
   (set (make-local-variable 'comment-start-skip) 
-       "\\(?://[/!]*\\|/\\*[\\*!]?\\)[[:space:]]*")
-  (set (make-local-variable 'paragraph-start) 
-       "[[:space:]]*\\(?://[/!]*\\|\\**\\)?[[:space:]]*$");;"[[:space:]]*\\(?:\\*[[:space:]]*\\)?$")
-  (set (make-local-variable 'paragraph-separate) paragraph-start))
+       "\\(?://[/!]*\\|/\\*[*!]?\\)[[:space:]]*")
+  (set (make-local-variable 'paragraph-start)
+       (concat "[[:space:]]*\\(?:" comment-start-skip "\\|\\*[[:space:]]*\\|\\)$"))
+  (set (make-local-variable 'paragraph-separate) paragraph-start)
+  (set (make-local-variable 'normal-auto-fill-function) 'rust-do-auto-fill)
+  (set (make-local-variable 'fill-paragraph-function) 'rust-fill-paragraph))
 
 
 ;;;###autoload
