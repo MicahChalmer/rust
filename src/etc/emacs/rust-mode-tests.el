@@ -63,42 +63,53 @@
 
 (setq rust-test-fill-column 32)
 
-(defun test-fill-paragraph (unfilled position expected-result)
-  (rust-test-manip-code
-   unfilled
-   position
-   (lambda () (let ((fill-column rust-test-fill-column)) (fill-paragraph)))
-   expected-result))
+(defun test-fill-paragraph (unfilled expected &optional start-pos end-pos)
+  "We're going to run through many scenarios here--the point should be able to be anywhere from the start-pos (defaults to 1) through end-pos (defaults to the length of what was passed in) and (fill-paragraph) should return the same result.
+
+Also, the result should be the same regardless of whether the code is at the beginning or end of the file.  (If you're not careful, that can make a difference.)  So we test each position given above with the passed code at the beginning, the end, neither and both.  So we do this a total of (end-pos - start-pos)*4 times.  Oy."
+  (let ((start-pos (or start-pos 1))
+        (end-pos (or end-pos (length unfilled))))
+    (loop
+     for pad-at-beginning from 0 to 1
+     for pad-at-end from 0 to 1
+     for pos from start-pos to end-pos
+     do (let* 
+            ((padding "\n     \n")
+             (padding-len (length padding))
+             (padding-beginning (if (= 0 pad-at-beginning) "" padding))
+             (padding-end (if (= 0 pad-at-end) "" padding))
+             (unfilled (concat
+                        padding-beginning
+                        unfilled
+                        padding-end))
+             (expected (concat
+                        padding-beginning
+                        expected
+                        padding-end))
+             (pos (+ (* padding-len pad-at-beginning) pos)))
+          (rust-test-manip-code
+           unfilled
+           pos
+           (lambda () 
+             (let ((fill-column rust-test-fill-column)) 
+               (fill-paragraph)))
+           expected)))))
 
 (ert-deftest fill-paragraph-top-level-multi-line-style-doc-comment-second-line ()
   (test-fill-paragraph 
-   "
-/**
+   "/**
  * This is a very very very very very very very long string
  */"
-   2
-   "
-/**
+   "/**
  * This is a very very very very
  * very very very long string
  */"))
 
-(ert-deftest fill-paragraph-top-level-multi-line-style-doc-comment-second-line-top-of-file ()
-  (test-fill-paragraph 
-   "/**
- * This is a very very very very very very very long string
- */"
-   2
-   "/**
- * This is a very very very very
- * very very very long string
- */"))
 
 (ert-deftest fill-paragraph-top-level-multi-line-style-doc-comment-first-line ()
   (test-fill-paragraph
    "/** This is a very very very very very very very long string
  */"
-  1
    "/** This is a very very very
  * very very very very long
  * string
@@ -107,34 +118,31 @@
 (ert-deftest fill-paragraph-multi-paragraph-multi-line-style-doc-comment ()
   (let
       ((multi-paragraph-unfilled
-        "
-/**
+        "/**
  * This is the first really really really really really really really long paragraph
  *
  * This is the second really really really really really really long paragraph
  */"))
     (test-fill-paragraph
      multi-paragraph-unfilled
-     7
-     "
-/**
+     "/**
  * This is the first really
  * really really really really
  * really really long paragraph
  *
  * This is the second really really really really really really long paragraph
- */")
+ */"
+     1 89)
     (test-fill-paragraph
      multi-paragraph-unfilled
-     98
-     "
-/**
+     "/**
  * This is the first really really really really really really really long paragraph
  *
  * This is the second really
  * really really really really
  * really long paragraph
- */")))
+ */"
+     90)))
 
 (ert-deftest fill-paragraph-multi-paragraph-single-line-style-doc-comment ()
   (let
@@ -144,44 +152,37 @@
 /// This is the second really really really really really really long paragraph"))
     (test-fill-paragraph
      multi-paragraph-unfilled
-     7
      "/// This is the first really
 /// really really really really
 /// really really long paragraph
 ///
-/// This is the second really really really really really really long paragraph")
-    (let ((with-second-paragraph-filled "/// This is the first really really really really really really really long paragraph
+/// This is the second really really really really really really long paragraph"
+     1 85)
+    (test-fill-paragraph
+     multi-paragraph-unfilled
+     "/// This is the first really really really really really really really long paragraph
 ///
 /// This is the second really
 /// really really really really
-/// really long paragraph"))
-      (test-fill-paragraph
-       multi-paragraph-unfilled
-       98 ;; Within second paragraph
-       with-second-paragraph-filled)
-      (test-fill-paragraph
-       multi-paragraph-unfilled
-       90 ;; End of the separator line in the middle
-       with-second-paragraph-filled))))
+/// really long paragraph"
+     86)))
 
 (ert-deftest fill-paragraph-multi-paragraph-single-line-style-indented ()
   (test-fill-paragraph
    "     // This is the first really really really really really really really long paragraph
      //
      // This is the second really really really really really really long paragraph"
-   7 ;; In between the //
    "     // This is the first really
      // really really really
      // really really really
      // long paragraph
      //
-     // This is the second really really really really really really long paragraph"))
+     // This is the second really really really really really really long paragraph" 1 89))
 
 (ert-deftest fill-paragraph-multi-line-style-inner-doc-comment ()
   (test-fill-paragraph
    "/*! This is a very very very very very very very long string
  */"
-   1
    "/*! This is a very very very
  * very very very very long
  * string
@@ -190,7 +191,6 @@
 (ert-deftest fill-paragraph-single-line-style-inner-doc-comment ()
   (test-fill-paragraph
    "//! This is a very very very very very very very long string"
-   1
    "//! This is a very very very
 //! very very very very long
 //! string"))
@@ -202,88 +202,38 @@ This is my summary. Blah blah blah blah blah. Dilly dally dilly dally dilly dall
 
 This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
 */"
-   4
    "/**
 This is my summary. Blah blah
 blah blah blah. Dilly dally
 dilly dally dilly dally doo.
 
 This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
-*/"))
+*/" 4 90))
 
 (ert-deftest fill-paragraph-single-line-inline-comment ()
-  "I'm not sure what this scenario should even do.  I'm leaving this in here to mark that uncertainty, expecting to fail for now.")
+  "I'm not sure what this scenario should even do.  I'm leaving this in here to mark that uncertainty, expecting to fail for now."
   :expected-result :failed
   (test-fill-paragraph
    "other stuff       /* This is a very very very very very very very long string */"
-   4
-"other stuff /* This is a very
+   "other stuff /* This is a very
              * very very very
              * very very very
-             * long string */"))
-
-(ert-deftest fill-paragraph-multi-positions-near-last-line ()
-  (let ((test-comment
-"
-/** 
- * This is a very very very very very very very long string
- */")
-        (correctly-filled
-"
-/** 
- * This is a very very very very
- * very very very long string
- */"))
-    (test-fill-paragraph
-     test-comment
-     66 ;; At end of the text line
-     correctly-filled)
-    (test-fill-paragraph
-     test-comment
-     67 ;; At beginning of comment-closing line
-     correctly-filled)
-))
-
-(ert-deftest fill-paragraph-multi-line-non-doc-comment-first-line ()
-  (let ((test-comment 
-"/*
- * This is a very very very very very very very long string
- */"
-)
-    (correctly-filled
-"/*
- * This is a very very very very
- * very very very long string
- */"))
-    (test-fill-paragraph
-     test-comment
-     1
-     correctly-filled)))
+             * long string */"
+   20))
 
 (ert-deftest fill-paragraph-with-no-space-after-star-prefix ()
   (let ((test-comment
-"
-/** 
- *This is a very very very very very very very long string
- */")
+)
         (correctly-filled
-"
-/** 
+))
+    (test-fill-paragraph
+     "/** 
+ *This is a very very very very very very very long string
+ */"
+     "/** 
  *This is a very very very very
  *very very very long string
- */"))
-    (test-fill-paragraph
-     test-comment
-     4 ;; in the middle of the /**
-     correctly-filled)
-    (test-fill-paragraph
-     test-comment
-     62 ;; On second line of comment
-     correctly-filled)
-    (test-fill-paragraph
-     test-comment
-     66 ;; On last line of comment
-     correctly-filled)))
+ */")))
 
 (defun test-auto-fill (initial position inserted expected-result)
   (rust-test-manip-code
@@ -302,14 +252,12 @@ This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
 
 (ert-deftest auto-fill-multi-line-doc-comment ()
   (test-auto-fill
-   "
-/**
+   "/**
  * 
  */"
    9
    "This is a very very very very very very very long string"
-   "
-/**
+   "/**
  * This is a very very very very
  * very very very long string
  */"))
