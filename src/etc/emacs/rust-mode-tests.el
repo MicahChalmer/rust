@@ -4,6 +4,40 @@
 (require 'ert)
 (require 'cl)
 
+(defun rust-compare-code-after-manip (original point-pos manip-func expected got)
+  (equal expected got))
+
+(defun rust-test-explain-bad-manip (original point-pos manip-func expected got)
+  (if (equal expected got)
+      nil
+    (list 
+     ;; The (goto-char) and (insert) business here is just for
+     ;; convenience--after an error, you can copy-paste that into emacs eval to
+     ;; insert the bare strings into a buffer
+     "Rust code was manipulated wrong after"
+     `(goto-char ,point-pos)
+     `(original (insert ,original))
+     `(expected (insert ,expected))
+     `(got (insert ,got))
+     (list 'first-difference-at
+           (loop for i from 0
+                 for oi across original
+                 for ei across expected
+                 do (when (not (= oi ei))
+                      (return (format 
+                               "(goto-char %d) (expected %S, got %S)"
+                               i ei oi))))))))
+(put 'rust-compare-code-after-manip 'ert-explainer 'rust-test-explain-bad-manip)
+
+(defun rust-test-manip-code (original point-pos manip-func expected)
+  (with-temp-buffer
+    (rust-mode)
+    (insert original)
+    (goto-char point-pos)
+    (funcall manip-func)
+    (should (rust-compare-code-after-manip
+             original point-pos manip-func expected (buffer-string)))))
+
 ;; Creating tests based on the rust code files in indentation-tests/.  See the README there.
 (loop for filename in (directory-files 
                        (expand-file-name "indentation-tests"
@@ -13,22 +47,28 @@
            (eval
             `(ert-deftest ,test-name ()
                (with-temp-buffer
-                 (rust-mode)
                  (insert-file-contents-literally ,filename)
-                 (let ((original-contents (buffer-string)))
-                   (replace-regexp "^[[:space:]]*" "") ; Remove all existing indentation
-                   (replace-regexp "^" "      ") ; Add some extra space to make sure it's taken away
-                   (indent-region 1 (buffer-size))
-                   (should (equal original-contents (buffer-string)))
-                   ))))))
+                 (let* ((original-contents (buffer-string))
+                        (deindented-contents
+                         (progn
+                           (goto-char 1)
+                           (replace-regexp "^[[:blank:]]*" "")
+                           (goto-char 1)
+                           (replace-regexp "^" "      ")
+                           (buffer-string))))
+                   (rust-test-manip-code
+                    deindented-contents 1
+                    (lambda () (indent-region 1 (buffer-size)))
+                    original-contents)))))))
+
+(setq rust-test-fill-column 32)
 
 (defun test-fill-paragraph (unfilled position expected-result)
-  (with-temp-buffer
-    (rust-mode)
-    (insert unfilled)
-    (goto-char position)
-    (let ((fill-column 32)) (fill-paragraph))
-    (should (equal expected-result (buffer-string)))))
+  (rust-test-manip-code
+   unfilled
+   position
+   (lambda () (let ((fill-column rust-test-fill-column)) (fill-paragraph)))
+   expected-result))
 
 (ert-deftest fill-paragraph-top-level-multi-line-style-doc-comment-second-line ()
   (test-fill-paragraph 
@@ -172,7 +212,7 @@ This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
 */"))
 
 (ert-deftest fill-paragraph-single-line-inline-comment ()
-  ;;FIXME: Not sure what this should even do...
+  "I'm not sure what this scenario should even do.  I'm leaving this in here to mark that uncertainty, expecting to fail for now.")
   :expected-result :failed
   (test-fill-paragraph
    "other stuff       /* This is a very very very very very very very long string */"
@@ -204,6 +244,22 @@ This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
      correctly-filled)
 ))
 
+(ert-deftest fill-paragraph-multi-line-non-doc-comment-first-line ()
+  (let ((test-comment 
+"/*
+ * This is a very very very very very very very long string
+ */"
+)
+    (correctly-filled
+"/*
+ * This is a very very very very
+ * very very very long string
+ */"))
+    (test-fill-paragraph
+     test-comment
+     1
+     correctly-filled)))
+
 (ert-deftest fill-paragraph-with-no-space-after-star-prefix ()
   (let ((test-comment
 "
@@ -230,15 +286,19 @@ This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
      correctly-filled)))
 
 (defun test-auto-fill (initial position inserted expected-result)
-  (with-temp-buffer
-    (rust-mode) 
-    (auto-fill-mode)
-    (let ((fill-column 32))
-      (insert initial)
-      (goto-char position)
-      (insert inserted)
-      (funcall (or auto-fill-function (function do-auto-fill)))
-      (should (equal expected-result (buffer-string))))))
+  (rust-test-manip-code
+   initial
+   position
+   (lambda ()
+     (unwind-protect
+         (progn
+           (let ((fill-column 32))
+             (auto-fill-mode)
+             (goto-char position)
+             (insert inserted)
+             (funcall (or auto-fill-function (function do-auto-fill)))
+             (auto-fill-mode t)))))
+   expected-result))
 
 (ert-deftest auto-fill-multi-line-doc-comment ()
   (test-auto-fill
@@ -281,7 +341,7 @@ This is some more text.  Fee fie fo fum.  Humpty dumpty sat on a wall.
  */"
    4
    "This is a very very very very very very very long string"
-   "/* 
+   "/*
 This is a very very very very
 very very very long string
 */"
