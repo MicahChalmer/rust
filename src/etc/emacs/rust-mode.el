@@ -222,14 +222,13 @@
         (setq result (concat result " ")))
     result))
 
-(defun rust-with-comment-fill-prefix (body)
-  "Set `fill-prefix' to handle multi-line comments with a * prefix on each line."
+(defun rust-in-paragraph-with-fill-prefix (body)
   ;; We might move the point to fill the next comment, but we don't want it
   ;; seeming to jump around on the user
   (save-excursion
     (let
         ((comment-in-front-regexp (concat "[[:space:]]*" comment-start-skip)))
-    
+      
       ;; If we're outside of a comment, with only whitespace and then a comment
       ;; in front, jump to the comment and prepare to fill it.
       (when (not (nth 4 (syntax-ppss)))
@@ -245,9 +244,9 @@
         (when (save-excursion
                 (end-of-line)
                 (and (nth 4 (syntax-ppss))
-                   (looking-back comment-start-skip)
-                   (looking-at "[[:space:]]*$")
-                   (nth 4 (syntax-ppss next-bol))))
+                     (looking-back comment-start-skip)
+                     (looking-at "[[:space:]]*$")
+                     (nth 4 (syntax-ppss next-bol))))
           (progn
             (goto-char next-bol))))
 
@@ -265,23 +264,26 @@
            (line-comment-start
             (when (nth 4 (syntax-ppss)) 
               (cond
-                ;; If we're inside the comment and see a * prefix, use it
-                ((string-match "^\\([[:space:]]*\\*+[[:space:]]*\\)"
-                               line-string)
-                 (match-string 1 line-string))
-                ;; If we're at the start of a comment, figure out what prefix
-                ;; to use for the subsequent lines after it
-                ((string-match comment-in-front-regexp line-string)
-                 (rust-fill-prefix-for-comment-start 
-                  (match-string 0 line-string))))))
+               ;; If we're inside the comment and see a * prefix, use it
+               ((string-match "^\\([[:space:]]*\\*+[[:space:]]*\\)"
+                            line-string)
+                (match-string 1 line-string))
+             ;; If we're at the start of a comment, figure out what prefix
+             ;; to use for the subsequent lines after it
+               ((string-match comment-in-front-regexp line-string)
+                (rust-fill-prefix-for-comment-start 
+                 (match-string 0 line-string))))))
            (fill-prefix 
             (or line-comment-start
-              fill-prefix)))
+                fill-prefix)))
         (funcall body)))))
+
+(defun rust-find-fill-prefix ()
+  (rust-in-paragraph-with-fill-prefix (lambda () fill-prefix)))
 
 (defun rust-fill-paragraph (&rest args)
   "Special wrapping for `fill-paragraph' to handle multi-line comments with a * prefix on each line."
-  (rust-with-comment-fill-prefix
+  (rust-in-paragraph-with-fill-prefix
    (lambda ()
      (let
          ((fill-paragraph-function
@@ -292,7 +294,7 @@
 
 (defun rust-do-auto-fill (&rest args)
   "Special wrapping for `do-auto-fill' to handle multi-line comments with a * prefix on each line."
-  (rust-with-comment-fill-prefix
+  (rust-in-paragraph-with-fill-prefix
    (lambda ()
      (apply 'do-auto-fill args)
      t)))
@@ -335,7 +337,9 @@
   (set (make-local-variable 'paragraph-separate) paragraph-start)
   (set (make-local-variable 'normal-auto-fill-function) 'rust-do-auto-fill)
   (set (make-local-variable 'fill-paragraph-function) 'rust-fill-paragraph)
-  (set (make-local-variable 'fill-forward-paragraph-function) 'rust-fill-forward-paragraph))
+  (set (make-local-variable 'fill-forward-paragraph-function) 'rust-fill-forward-paragraph)
+  (set (make-local-variable 'adaptive-fill-function) 'rust-find-fill-prefix)
+  )
 
 
 ;;;###autoload
